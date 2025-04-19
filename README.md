@@ -1,3 +1,7 @@
+
+
+`npm i @codebucket/files`
+
 ```
 import { Files } from '@codebucket/uploads';
 import { readFileSync, writeFileSync } from 'fs';
