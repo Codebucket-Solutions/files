@@ -2,79 +2,123 @@
 
 `npm i @codebucket/files`
 
+
+## S3 EXAMPLE
+
 ```
-import { Files } from '@codebucket/uploads';
-import { readFileSync, writeFileSync } from 'fs';
+//utils/upload.js
+const {Files} = require("@codebucket/files");
 
-async function s3Example() {
-  const files = new Files({
-    type: 's3',
-    bucketName: 'my-bucket',
-    endpoint: 'https://s3-compatible-service.com',
-    s3Config: {
-      credentials: {
-        accessKeyId: 'YOUR_ACCESS_KEY',
-        secretAccessKey: 'YOUR_SECRET_KEY',
-      },
-      region: 'us-east-1',
-    },
-  });
+let fileStorage = new Files(
+	{
+		type: "s3",
+		publicBaseUrl: process.env.BASEURL+'/files',
+		bucketName: process.env.S3_BUCKET_NAME,
+		endpoint: process.env.S3_ENDPOINT,
+		s3Config: {
+			region:process.env.S3_REGION ,
+			credentials: {
+				accessKeyId: process.env.S3_ACCESS_KEY_ID,
+				secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
+			},
+		}
+	}
+)
 
-  const fileData = readFileSync('./example.txt');
+//upload file example
+const upload = async (files, body, key = "document") => {
+	try {
 
-  // Upload file
-  const uploadedPath = await files.upload('folder/example.txt', fileData);
-  console.log('Uploaded to:', uploadedPath);
+		let fileName = new Date()
+			.toISOString()
+			.replace(/:/g, "-")
+			.replace(/[^a-z0-9]/gi, "_")
+			.toLowerCase() + path.extname(files[key].originalFilename);
 
-  // Download file
-  const downloadedData = await files.download('folder/example.txt');
-  writeFileSync('./downloaded_example.txt', downloadedData);
-  console.log('File downloaded to ./downloaded_example.txt');
+		await fileStorage.upload(`/${body.userId}/${fileName}`,fs.readFileSync((files[key].filepath)));
 
-  // Download multiple files as ZIP
-  const zipBuffer = await files.downloadZip(['folder/example.txt', 'folder/another-file.txt']);
-  writeFileSync('./files.zip', zipBuffer);
-  console.log('ZIP downloaded to ./files.zip');
+		const url = fileStorage.getPublicUrl(`/${body.userId}/${fileName}`);
 
-  // Get public URL
-  const publicUrl = files.getPublicUrl('folder/example.txt');
-  console.log('Public URL:', publicUrl);
+		return {
+			message: SUCCESS,
+			url: url,
+			name: fileName,
+		};
+	} catch (error) {
+		throw new ErrorHandler(SERVER_ERROR, error);
+	}
+};
+
+//download file example
+const download = async (req,res) => {
+	let fullPath = req.path;
+	fullPath = fullPath.replace("/files","");
+	await fileStorage.download(fullPath,res);
 }
 
-s3Example();
-```
-
-```
-import { Files } from '@codebucket/uploads';
-import { readFileSync, writeFileSync } from 'fs';
-
-async function filesystemExample() {
-  const files = new Files({
-    type: 'filesystem',
-    baseDir: './uploads',
-    publicBaseUrl: 'http://localhost:3000/uploads',
-  });
-
-  const fileData = readFileSync('./example.txt');
-
-  // Upload file
-  const uploadedPath = await files.upload('folder/example.txt', fileData);
-  console.log('Uploaded to:', uploadedPath);
-
-  // Download file
-  const downloadedData = await files.download('folder/example.txt');
-  writeFileSync('./downloaded_example.txt', downloadedData);
-  console.log('File downloaded to ./downloaded_example.txt');
-
-  // Download multiple files as ZIP
-  const zipBuffer = await files.downloadZip(['folder/example.txt', 'folder/another-file.txt']);
-  writeFileSync('./files.zip', zipBuffer);
-  console.log('ZIP downloaded to ./files.zip');
-
-  // Get public URL
-  const publicUrl = files.getPublicUrl('folder/example.txt');
-  console.log('Public URL:', publicUrl);
+//download zip
+const downloadZip = async (res) => {
+    let filePaths = ['/folder/file1.txt','/folder/file2.txt'];
+    await fileStorage.downloadZip(filePaths,res);
 }
 
-filesystemExample();
 ```
+### Route 
+```
+//Download Route
+//app.js
+app.get("/files/*",async (req, res)=>{
+  await download(req, res);
+});
+```
+
+## FILESYSTEM EXAMPLE
+
+```
+//utils/upload.js
+const {Files} = require("@codebucket/files");
+
+let fileStorage = new Files(
+	{
+		type: "filesystem",
+		publicBaseUrl: process.env.BASEURL,
+		baseDir: "./public"
+	}
+)
+
+//upload file example
+const upload = async (files, body, key = "document") => {
+	try {
+
+		let fileName = new Date()
+			.toISOString()
+			.replace(/:/g, "-")
+			.replace(/[^a-z0-9]/gi, "_")
+			.toLowerCase() + path.extname(files[key].originalFilename);
+
+		await fileStorage.upload(`/${body.userId}/${fileName}`,fs.readFileSync((files[key].filepath)));
+
+		const url = fileStorage.getPublicUrl(`/${body.userId}/${fileName}`);
+
+		return {
+			message: SUCCESS,
+			url: url,
+			name: fileName,
+		};
+	} catch (error) {
+		throw new ErrorHandler(SERVER_ERROR, error);
+	}
+};
+
+//download file example
+const download = async (req,res) => {
+	let fullPath = req.path;
+	fullPath = fullPath.replace("/files","");
+	await fileStorage.download(fullPath,res);
+}
+
+//download zip
+const downloadZip = async (res) => {
+    let filePaths = ['/folder/file1.txt','/folder/file2.txt'];
+    await fileStorage.downloadZip(filePaths,res);
+}
