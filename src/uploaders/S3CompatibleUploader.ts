@@ -4,6 +4,7 @@ import archiver from 'archiver';
 import { IUploader } from '../interfaces/IUploader';
 import {Readable} from 'stream';
 import { isAwsEndpoint } from '../utils/isAwsEndpoint';
+import mime from 'mime';
 
 export class S3CompatibleUploader implements IUploader {
   private s3Client: S3Client;
@@ -29,10 +30,13 @@ export class S3CompatibleUploader implements IUploader {
       if(this.baseDir)
           filePath = `${this.baseDir}${filePath}`
 
+      let contentType = mime.getType(filePath);
+
         await this.s3Client.send(new PutObjectCommand({
             Bucket: this.bucketName,
             Key: filePath,
             Body: data,
+            ContentType: contentType || "application/octet-stream"
         }));
 
       if(this.publicBaseUrl) {
@@ -42,7 +46,7 @@ export class S3CompatibleUploader implements IUploader {
       return `${this.endpoint}/${this.bucketName}${filePath}`;
   }
 
-  async download(filePath: string): Promise<Buffer> {
+  async download(filePath: string,res?:any): Promise<Buffer|void> {
 
       if(this.baseDir)
           filePath = `${this.baseDir}${filePath}`
@@ -54,30 +58,49 @@ export class S3CompatibleUploader implements IUploader {
 
     const stream = result.Body as Readable;
 
-    return new Promise<Buffer>((resolve, reject) => {
-      const chunks: Uint8Array[] = [];
-      stream.on('data', (chunk) => chunks.push(chunk));
-      stream.on('error', reject);
-      stream.on('end', () => resolve(Buffer.concat(chunks)));
-    });
+    if(res) {
+        let contentType = result.ContentType || "application/octet-stream";
+        if(contentType==="application/octet-stream") {
+            contentType = mime.getType(filePath) || "application/octet-stream";
+        }
+        if (typeof result.ContentLength === "number") {
+            res.setHeader("Content-Length", result.ContentLength.toString());
+        }
+        res.setHeader("Content-Type", contentType);
+        res.setHeader("Content-Disposition", "inline");
+        stream.pipe(res);
+    } else {
+        return new Promise<Buffer>((resolve, reject) => {
+            const chunks: Uint8Array[] = [];
+            stream.on('data', (chunk) => chunks.push(chunk));
+            stream.on('error', reject);
+            stream.on('end', () => resolve(Buffer.concat(chunks)));
+        });
+    }
   }
 
-  async downloadZip(filePaths: string[]): Promise<Buffer> {
+  async downloadZip(filePaths: string[],res?:any): Promise<Buffer|void> {
     const archive = archiver('zip', { zlib: { level: 9 } });
     const chunks: Buffer[] = [];
 
-    archive.on('data', (chunk: Buffer) => chunks.push(chunk));
+    if(!res)
+        archive.on('data', (chunk: Buffer) => chunks.push(chunk));
 
     await Promise.all(filePaths.map(async path => {
         if(this.baseDir)
             path = `${this.baseDir}/${path}`;
+
       const file = await this.download(path);
-      archive.append(file, { name: path });
+      archive.append(file as Buffer, { name: path });
     }));
+
+      if(res)
+          archive.pipe(res);
 
     await archive.finalize();
 
-    return Buffer.concat(chunks);
+      if(!res)
+          return Buffer.concat(chunks);
   }
 
   getPublicUrl(filePath: string): string {

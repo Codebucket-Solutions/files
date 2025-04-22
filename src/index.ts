@@ -17,12 +17,12 @@ export class Files implements IUploader {
     return this.uploader.upload(filePath, data);
   }
 
-  download(filePath: string): Promise<Buffer> {
-    return this.uploader.download(filePath);
+  download(filePath: string, res?:any): Promise<Buffer|void> {
+    return this.uploader.download(filePath,res);
   }
 
-  downloadZip(filePaths: string[]): Promise<Buffer> {
-    return this.uploader.downloadZip(filePaths);
+  downloadZip(filePaths: string[], res?:any): Promise<Buffer|void> {
+    return this.uploader.downloadZip(filePaths,res);
   }
 
   getPublicUrl(filePath: string): string {

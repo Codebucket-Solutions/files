@@ -1,6 +1,7 @@
 import fs from 'fs-extra';
 import archiver from 'archiver';
 import { IUploader } from '../interfaces/IUploader';
+import mime from 'mime';
 
 export class FileSystemUploader implements IUploader {
   constructor(private baseDir: string, private publicBaseUrl?: string) {
@@ -13,24 +14,36 @@ export class FileSystemUploader implements IUploader {
     return fullPath;
   }
 
-  async download(filePath: string): Promise<Buffer> {
+  async download(filePath: string,res?:any):  Promise<void | Buffer> {
     const fullPath = `${this.baseDir}${filePath}`;
-    return fs.readFile(fullPath);
+    if(res) {
+      const contentType = mime.getType(fullPath) || "application/octet-stream";
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Content-Length", fs.statSync(fullPath).size);
+      res.setHeader("Content-Disposition", "inline");
+      fs.createReadStream(fullPath).pipe(res);
+    } else
+      return fs.readFile(fullPath);
   }
 
-  async downloadZip(filePaths: string[]): Promise<Buffer> {
+  async downloadZip(filePaths: string[], res?:any): Promise<void | Buffer>  {
     const archive = archiver('zip', { zlib: { level: 9 } });
     const chunks: Buffer[] = [];
 
-    archive.on('data', chunk => chunks.push(chunk));
+    if(!res)
+      archive.on('data', chunk => chunks.push(chunk));
 
     filePaths.forEach(path => {
       archive.file(`${this.baseDir}${path}`, { name: path });
     });
 
+    if(res)
+      archive.pipe(res);
+
     await archive.finalize();
 
-    return Buffer.concat(chunks);
+    if(!res)
+      return Buffer.concat(chunks);
   }
 
   getPublicUrl(filePath: string): string {
