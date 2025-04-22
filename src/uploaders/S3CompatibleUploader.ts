@@ -1,20 +1,29 @@
 // src/uploaders/S3CompatibleUploader.ts
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import {S3Client, PutObjectCommand, GetObjectCommand, S3ClientConfig} from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import archiver from 'archiver';
 import { IUploader } from '../interfaces/IUploader';
 import {Readable} from 'stream';
+import { isAwsEndpoint } from '../utils/isAwsEndpoint';
 
 export class S3CompatibleUploader implements IUploader {
   private s3Client: S3Client;
 
   constructor(private bucketName: string, private endpoint: string, config?: any) {
-    this.s3Client = new S3Client({
-      endpoint: this.endpoint,
-      region: config?.region || 'us-east-1',
-      credentials: config?.credentials,
-      forcePathStyle: true,
-    });
+
+      let options:S3ClientConfig = {
+          endpoint: this.endpoint,
+          region: config?.region || 'us-east-1',
+          credentials: config?.credentials,
+          forcePathStyle: true,
+      }
+
+      if(!isAwsEndpoint(this.endpoint)) {
+          options = {...options,requestChecksumCalculation: "WHEN_REQUIRED",responseChecksumValidation: "WHEN_REQUIRED",}
+      }
+
+      this.s3Client = new S3Client(options);
+
   }
 
   async upload(filePath: string, data: Buffer): Promise<string> {
