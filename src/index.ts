@@ -5,11 +5,11 @@ import { S3CompatibleUploader } from './uploaders/S3CompatibleUploader';
 export class Files implements IUploader {
   private uploader: IUploader;
 
-  constructor(config: { type: 'filesystem'; baseDir: string; publicBaseUrl?: string } | { type: 's3'; bucketName: string; endpoint: string; s3Config?: any }) {
+  constructor(config: { type: 'filesystem'; baseDir: string; publicBaseUrl?: string } | { type: 's3';  baseDir?: string; publicBaseUrl?: string;bucketName: string; endpoint: string; s3Config?: any }) {
     if (config.type === 'filesystem') {
       this.uploader = new FileSystemUploader(config.baseDir, config.publicBaseUrl);
     } else {
-      this.uploader = new S3CompatibleUploader(config.bucketName, config.endpoint, config.s3Config);
+      this.uploader = new S3CompatibleUploader(config.bucketName, config.endpoint, config.baseDir, config.publicBaseUrl, config.s3Config);
     }
   }
 

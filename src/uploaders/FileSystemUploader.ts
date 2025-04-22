@@ -8,13 +8,13 @@ export class FileSystemUploader implements IUploader {
   }
 
   async upload(filePath: string, data: Buffer): Promise<string> {
-    const fullPath = `${this.baseDir}/${filePath}`;
+    const fullPath = `${this.baseDir}${filePath}`;
     await fs.outputFile(fullPath, data);
     return fullPath;
   }
 
   async download(filePath: string): Promise<Buffer> {
-    const fullPath = `${this.baseDir}/${filePath}`;
+    const fullPath = `${this.baseDir}${filePath}`;
     return fs.readFile(fullPath);
   }
 
@@ -25,7 +25,7 @@ export class FileSystemUploader implements IUploader {
     archive.on('data', chunk => chunks.push(chunk));
 
     filePaths.forEach(path => {
-      archive.file(`${this.baseDir}/${path}`, { name: path });
+      archive.file(`${this.baseDir}${path}`, { name: path });
     });
 
     await archive.finalize();
@@ -35,6 +35,8 @@ export class FileSystemUploader implements IUploader {
 
   getPublicUrl(filePath: string): string {
     if (!this.publicBaseUrl) throw new Error('Public base URL is not configured');
-    return `${this.publicBaseUrl}/${filePath}`;
+
+
+    return `${this.publicBaseUrl}${filePath}`;
   }
 }
