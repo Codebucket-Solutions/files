@@ -15,12 +15,14 @@ export class FileSystemUploader implements IUploader {
   }
 
   async download(filePath: string,res?:any):  Promise<void | Buffer> {
-    const fullPath = `${this.baseDir}${filePath}`;
+    let fullPath = `${this.baseDir}${filePath}`;
+    fullPath = decodeURIComponent(fullPath);
     if(res) {
       const contentType = mime.getType(fullPath) || "application/octet-stream";
       res.setHeader("Content-Type", contentType);
       res.setHeader("Content-Length", fs.statSync(fullPath).size);
       res.setHeader("Content-Disposition", "inline");
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
       fs.createReadStream(fullPath).pipe(res);
     } else
       return fs.readFile(fullPath);

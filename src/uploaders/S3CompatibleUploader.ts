@@ -30,6 +30,10 @@ export class S3CompatibleUploader implements IUploader {
       if(this.baseDir)
           filePath = `${this.baseDir}${filePath}`
 
+      if (filePath.startsWith('/')) {
+          filePath = filePath.slice(1);
+      }
+
       let contentType = mime.getType(filePath);
 
         await this.s3Client.send(new PutObjectCommand({
@@ -51,6 +55,14 @@ export class S3CompatibleUploader implements IUploader {
       if(this.baseDir)
           filePath = `${this.baseDir}${filePath}`
 
+      if (filePath.startsWith('/')) {
+          filePath = filePath.slice(1);
+      }
+
+
+      filePath = decodeURIComponent(filePath);
+
+
     const result = await this.s3Client.send(new GetObjectCommand({
       Bucket: this.bucketName,
       Key: filePath,
@@ -68,6 +80,7 @@ export class S3CompatibleUploader implements IUploader {
         }
         res.setHeader("Content-Type", contentType);
         res.setHeader("Content-Disposition", "inline");
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
         stream.pipe(res);
     } else {
         return new Promise<Buffer>((resolve, reject) => {
@@ -89,6 +102,12 @@ export class S3CompatibleUploader implements IUploader {
     await Promise.all(filePaths.map(async path => {
         if(this.baseDir)
             path = `${this.baseDir}/${path}`;
+
+        if (path.startsWith('/')) {
+            path = path.slice(1);
+        }
+
+        path = decodeURIComponent(path);
 
       const file = await this.download(path);
       archive.append(file as Buffer, { name: path });
