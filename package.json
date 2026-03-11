@@ -1,6 +1,6 @@
 {
   "name": "@codebucket/files",
-  "version": "1.0.32",
+  "version": "1.0.33",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
@@ -11,11 +11,21 @@
     "@aws-sdk/lib-storage": "^3.758.0",
     "archiver": "^6.0.1",
     "fs-extra": "^11.2.0",
-    "mime": "^4.0.7"
+    "mime": "^4.0.7",
+    "multer": "^2.0.0"
+  },
+  "peerDependencies": {
+    "@azure/storage-blob": "^12.28.0"
+  },
+  "peerDependenciesMeta": {
+    "@azure/storage-blob": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/archiver": "^6.0.3",
     "@types/fs-extra": "^11.0.1",
+    "@types/multer": "^2.0.0",
     "@types/node": "^20.17.24",
     "typescript": "^5.3.3"
   }

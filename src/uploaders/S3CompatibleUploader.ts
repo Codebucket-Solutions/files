@@ -1,7 +1,8 @@
 // src/uploaders/S3CompatibleUploader.ts
-import {S3Client, PutObjectCommand, GetObjectCommand, S3ClientConfig} from '@aws-sdk/client-s3';
+import {S3Client, PutObjectCommand, GetObjectCommand, S3ClientConfig, DeleteObjectCommand} from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
 import archiver from 'archiver';
-import { IUploader } from '../interfaces/IUploader';
+import { IUploader, UploadOptions } from '../interfaces/IUploader';
 import {Readable} from 'stream';
 import { isAwsEndpoint } from '../utils/isAwsEndpoint';
 import mime from 'mime';
@@ -26,7 +27,7 @@ export class S3CompatibleUploader implements IUploader {
 
   }
 
-  async upload(filePath: string, data: Buffer): Promise<string> {
+  private normalizeKey(filePath: string): string {
       if(this.baseDir)
           filePath = `${this.baseDir}${filePath}`
 
@@ -34,15 +35,10 @@ export class S3CompatibleUploader implements IUploader {
           filePath = filePath.slice(1);
       }
 
-      let contentType = mime.getType(filePath);
+      return filePath;
+  }
 
-        await this.s3Client.send(new PutObjectCommand({
-            Bucket: this.bucketName,
-            Key: filePath,
-            Body: data,
-            ContentType: contentType || "application/octet-stream"
-        }));
-
+  private buildLocation(filePath: string): string {
       if(this.publicBaseUrl) {
           return `${this.publicBaseUrl}${filePath}`;
       }
@@ -50,15 +46,44 @@ export class S3CompatibleUploader implements IUploader {
       return `${this.endpoint}/${this.bucketName}${filePath}`;
   }
 
+  async upload(filePath: string, data: Buffer, options?: UploadOptions): Promise<string> {
+      filePath = this.normalizeKey(filePath);
+
+      let contentType = options?.contentType || mime.getType(filePath);
+
+        await this.s3Client.send(new PutObjectCommand({
+            Bucket: this.bucketName,
+            Key: filePath,
+            Body: data,
+            ContentType: contentType || "application/octet-stream",
+            ContentLength: options?.contentLength,
+            Metadata: options?.metadata
+        }));
+
+      return this.buildLocation(filePath);
+  }
+
+  async uploadStream(filePath: string, stream: Readable, options?: UploadOptions): Promise<string> {
+      filePath = this.normalizeKey(filePath);
+
+      const upload = new Upload({
+        client: this.s3Client,
+        params: {
+          Bucket: this.bucketName,
+          Key: filePath,
+          Body: stream,
+          ContentType: options?.contentType || mime.getType(filePath) || "application/octet-stream",
+          ContentLength: options?.contentLength,
+          Metadata: options?.metadata,
+        },
+      });
+
+      await upload.done();
+      return this.buildLocation(filePath);
+  }
+
   async download(filePath: string,res?:any): Promise<Buffer|void> {
-
-      if(this.baseDir)
-          filePath = `${this.baseDir}${filePath}`
-
-      if (filePath.startsWith('/')) {
-          filePath = filePath.slice(1);
-      }
-
+      filePath = this.normalizeKey(filePath);
 
       filePath = decodeURIComponent(filePath);
 
@@ -123,11 +148,23 @@ export class S3CompatibleUploader implements IUploader {
   }
 
   getPublicUrl(filePath: string): string {
-      if(this.publicBaseUrl)
+      if (this.publicBaseUrl) {
           return `${this.publicBaseUrl}${filePath}`;
+      }
 
-      if(this.baseDir)
-          filePath = `${this.baseDir}${filePath}`
-    return `${this.endpoint}/${this.bucketName}${filePath}`;
+      return this.buildLocation(this.normalizeKey(filePath));
+  }
+
+  async delete(filePath: string): Promise<void> {
+    filePath = this.normalizeKey(filePath);
+
+    filePath = decodeURIComponent(filePath);
+
+    await this.s3Client.send(
+      new DeleteObjectCommand({
+        Bucket: this.bucketName,
+        Key: filePath,
+      }),
+    );
   }
 }

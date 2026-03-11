@@ -1,16 +1,26 @@
 import fs from 'fs-extra';
 import archiver from 'archiver';
-import { IUploader } from '../interfaces/IUploader';
+import { pipeline } from 'stream/promises';
+import { IUploader, UploadOptions } from '../interfaces/IUploader';
 import mime from 'mime';
+import type { Readable } from 'stream';
+import path from 'path';
 
 export class FileSystemUploader implements IUploader {
   constructor(private baseDir: string, private publicBaseUrl?: string) {
     fs.ensureDirSync(this.baseDir);
   }
 
-  async upload(filePath: string, data: Buffer): Promise<string> {
+  async upload(filePath: string, data: Buffer, _options?: UploadOptions): Promise<string> {
     const fullPath = `${this.baseDir}${filePath}`;
     await fs.outputFile(fullPath, data);
+    return fullPath;
+  }
+
+  async uploadStream(filePath: string, stream: Readable): Promise<string> {
+    const fullPath = `${this.baseDir}${filePath}`;
+    await fs.ensureDir(path.dirname(fullPath));
+    await pipeline(stream, fs.createWriteStream(fullPath));
     return fullPath;
   }
 
@@ -46,6 +56,12 @@ export class FileSystemUploader implements IUploader {
 
     if(!res)
       return Buffer.concat(chunks);
+  }
+
+  async delete(filePath: string): Promise<void> {
+    let fullPath = `${this.baseDir}${filePath}`;
+    fullPath = decodeURIComponent(fullPath);
+    await fs.remove(fullPath);
   }
 
   getPublicUrl(filePath: string): string {
